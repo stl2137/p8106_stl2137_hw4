@@ -1,0 +1,37 @@
+---
+title: "p8106_stl2137_hw4"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lasso2)
+library(rpart)
+library(rpart.plot)
+```
+
+# Question 1
+
+```{r}
+### Loading in prostate data
+data("Prostate") 
+dat_prostate <- Prostate
+```
+
+## Part A
+(a) Fit a regression tree with lpsa as the response and the other variables as predictors. Use cross-validation to determine the optimal tree size. Which tree size corresponds to the lowest cross-validation error? Is this the same as the tree size obtained using the 1 SE rule?
+
+```{r}
+set.seed(1)
+
+tree_prost_1 <- rpart(formula = lpsa ~., data = dat_prostate)
+rpart.plot(tree_prost_1)
+
+### Finding lowest cp 
+cp_table <- printcp(tree_prost_1)
+plotcp(tree_prost_1)
+
+
+```
+
