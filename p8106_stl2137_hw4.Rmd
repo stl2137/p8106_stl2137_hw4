@@ -20,7 +20,6 @@ dat_prostate <- Prostate
 ```
 
 ## Part A
-(a) Fit a regression tree with lpsa as the response and the other variables as predictors. Use cross-validation to determine the optimal tree size. Which tree size corresponds to the lowest cross-validation error? Is this the same as the tree size obtained using the 1 SE rule?
 
 ```{r}
 set.seed(1)
@@ -30,8 +29,45 @@ rpart.plot(tree_prost_1)
 
 ### Finding lowest cp 
 cp_table <- printcp(tree_prost_1)
-plotcp(tree_prost_1)
+#plotcp(tree_prost_1)
 
+minErr <- which.min(cp_table[,4])
+
+# minimum cross-validation error
+tree_prost_3 <- prune(tree_prost_1, cp = cp_table[minErr, 1])
+
+# 1SE rule
+tree_prost_4 <- prune(tree_prost_1, cp = 
+                        cp_table[cp_table[,4] < cp_table[minErr, 4] + cp_table[minErr, 5], 1][1])
+
+rpart.plot(tree_prost_3)
+rpart.plot(tree_prost_4)
+```
+
+The tree size that corresponds to the lowest cross-validation error is 8. This is not the same tree size as the one obtained using the 1 SE rule, as the tree size is 3. 
+
+## Part B
+
+Pick one of the terminal nodes, and interpret the information displayed.
+
+```{r}
+plotcp(tree_prost_1)
+```
+
+Based off the leftmost value for which the mean lies below the horizontal line in the cp plot, a cp = 0.1 and a tree size of 3 should be utilized. 
+
+```{r}
+set.seed(1)
+
+final_tree_prost <- rpart(lpsa ~ ., data = dat_prostate,
+                          control = rpart.control(cp = 0.1))
+
+rpart.plot(final_tree_prost)
+```
+
+(c) Perform bagging and report the variable importance.
+
+```{r}
 
 ```
 
