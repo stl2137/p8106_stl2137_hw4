@@ -11,7 +11,7 @@ library(rpart)
 library(rpart.plot)
 library(randomForest)
 library(gbm)
-library(ModelMetrics)
+library(ranger)
 ```
 
 # Question 1
@@ -51,7 +51,6 @@ The tree size that corresponds to the lowest cross-validation error is 8. This i
 
 ## Part B
 
-Pick one of the terminal nodes, and interpret the information displayed.
 
 ```{r}
 plotcp(tree_prost_1)
@@ -68,9 +67,9 @@ final_tree_prost <- rpart(lpsa ~ ., data = dat_prostate,
 rpart.plot(final_tree_prost)
 ```
 
-## Part C
+If you have a log cancer volume greater than 2.5, we predict that you will have a log prostate specific antigen level of 3.8. 
 
-(c) report the variable importance.
+## Part C
 
 ```{r}
 set.seed(1)
@@ -81,9 +80,25 @@ bagging_prost <- randomForest(lpsa ~ ., data = dat_prostate,
 bagging_prost$importance
 ```
 
-## Part D
+The variable for log cancer volume, at a value of `r bagging_prost$importance[1]`, has the highest variable importance. The variable for log of prostate weight, at the value of `r bagging_prost$importance[2]`, has the 2nd highest variable importance.
 
-(d) report the variable importance.
+### Using caret for RF
+```{r}
+control <- trainControl(method = "cv")
+
+rf_grid_prost <- expand.grid(mtry = 1:8,
+                       splitrule = "variance",
+                       min.node.size = 1:8)
+set.seed(1)
+rf_fit_prost <- train(lpsa ~., dat_prostate, 
+                method = "ranger",
+                tuneGrid = rf_grid_prost,
+                trControl = control)
+
+ggplot(rf_fit_prost, highlight = TRUE)
+```
+
+## Part D
 
 ```{r}
 set.seed(1)
@@ -93,9 +108,26 @@ rf_prost <- randomForest(lpsa ~ ., data = dat_prostate,
 rf_prost$importance
 ```
 
-## Part E
+The variable for log cancer volume, at a value of `r rf_prost$importance[1]`, has the highest variable importance. The variable for log of prostate weight, at the value of `r rf_prost$importance[2]`, has the 2nd highest variable importance. 
 
-(e) report the variable importance.
+### Caret for Boosting 
+
+```{r}
+gbm_grid <- expand.grid(n.trees = c(2000,3000),
+                        interaction.depth = 2:10,
+                        shrinkage = c(0.001,0.003,0.005),
+                        n.minobsinnode = 1)
+set.seed(1)
+gbm_fit_prost <- train(lpsa ~ ., dat_prostate, 
+                 method = "gbm",
+                 tuneGrid = gbm_grid,
+                 trControl = control,
+                 verbose = FALSE)
+
+ggplot(gbm_fit_prost, highlight = TRUE)
+```
+
+## Part E
 
 ```{r}
 set.seed(1)
@@ -107,15 +139,20 @@ boosting_prost <- gbm(lpsa ~ ., data = dat_prostate,
                       cv.folds = 10)
 
 nt <- gbm.perf(boosting_prost, method = "cv")
+
+boosting_plot <- summary(boosting_prost, las = 2, cBars = 19, cex.names = 0.6)
 ```
+
+The variable for log cancer volume, at a value of `r boosting_plot$rel.inf[1]`, has the highest variable importance. The variable for log of prostate weight, at the value of `r boosting_plot$rel.inf[2]`, has the 2nd highest variable importance.
 
 ## Part F
 
-(f) Which of the above models will you select to predict PSA level? Explain.
-
 ```{r}
-
+resamp <- resamples(list(rf = rf_fit_prost, gbm = gbm_fit_prost))
+summary(resamp)
 ```
+
+I would pick the random forest model. When comparing the RMSE of the two models when resampling, random forest has the lower mean RMSE. 
 
 # Problem 2
 
@@ -138,12 +175,11 @@ test_dat_oj <- as.data.frame(dat_oj[-rowTrain,])
 
 ## Part A
 
+What is the test classification error rate?
 
 ```{r}
 set.seed(1)
-
-oj_tree <- rpart(purchase ~., data = dat_oj,
-                 subset = rowTrain,
+oj_tree <- rpart(purchase ~., data = train_dat_oj,
                  control = rpart.control(cp = 0))
 #rpart.plot(oj_tree)
 
@@ -155,16 +191,45 @@ minErr_oj <- which.min(cp_table_oj[,4])
 oj_tree_2 <- prune(oj_tree, cp = cp_table_oj[minErr_oj, 1])
 rpart.plot(oj_tree_2)
 
-oj_tree_pred <- predict(oj_tree_2, newdata = test_dat_oj)
-oj_tree_mse <- mse(oj_tree_pred, test_dat_oj$purchase)
 ```
-Using cross-validation to determine the tree size, the tree size should be 6. The test classification MSE is `r oj_tree_mse`, so the classification error rate is `r 1- oj_tree_mse`.
 
 ## Part B
 
-Perform random forests on the training set and report variable importance. What is the test error rate?
+What is the test error rate?
 
 ```{r}
+set.seed(1)
+rf_oj <- ranger(purchase ~., train_dat_oj,
+                mtry = 6,
+                min.node.size = 5,
+                splitrule = "gini",
+                importance = "permutation",
+                scale.permutation.importance = TRUE)
 
+barplot(sort(ranger::importance(rf_oj), decreasing = FALSE), 
+        las = 2, horiz = TRUE, cex.names = 0.7,
+        col = colorRampPalette(colors = c("cyan","blue"))(8))
 ```
 
+The customer brand loyalty for Citrus Hill orange juice, at a value of `r max(importance(rf_oj))`, has the highest variable importance. As you can see in the bar plot, it a much higher variable importance compared to the other variables. 
+
+## Part C 
+report variable importance. What is the test error rate?
+
+```{r}
+set.seed(1)
+
+boosting_oj <- gbm(purchase ~., data = train_dat_oj,
+                   distribution = "gaussian",
+                   n.trees = 5000,
+                   interaction.depth = 3,
+                   shrinkage = 0.005,
+                   cv.folds = 10)
+
+nt_oj = gbm.perf(boosting_oj, method = "cv")
+
+summary(boosting_oj, las = 2, cBars = 19, cex.names = 0.6)
+boosting_imp_oj <- summary(boosting_oj)
+```
+
+The customer brand loyalty for Citrus Hill orange juice, at a value of `r boosting_imp_oj$rel.inf[1]`, has the highest variable importance. As you can see in the bar plot, it a much higher variable importance compared to the other variables.The week of purchase variable, at a value of `r boosting_imp_oj$rel.inf[2]`, has the 2nd highest variable importance.
