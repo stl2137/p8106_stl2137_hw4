@@ -9,6 +9,9 @@ library(tidyverse)
 library(lasso2)
 library(rpart)
 library(rpart.plot)
+library(randomForest)
+library(gbm)
+library(ModelMetrics)
 ```
 
 # Question 1
@@ -65,7 +68,101 @@ final_tree_prost <- rpart(lpsa ~ ., data = dat_prostate,
 rpart.plot(final_tree_prost)
 ```
 
-(c) Perform bagging and report the variable importance.
+## Part C
+
+(c) report the variable importance.
+
+```{r}
+set.seed(1)
+
+bagging_prost <- randomForest(lpsa ~ ., data = dat_prostate,
+                              mtry = 8)
+
+bagging_prost$importance
+```
+
+## Part D
+
+(d) report the variable importance.
+
+```{r}
+set.seed(1)
+rf_prost <- randomForest(lpsa ~ ., data = dat_prostate,
+                         mtry = 3)
+
+rf_prost$importance
+```
+
+## Part E
+
+(e) report the variable importance.
+
+```{r}
+set.seed(1)
+boosting_prost <- gbm(lpsa ~ ., data = dat_prostate,
+                      distribution = "gaussian",
+                      n.trees = 5000,
+                      interaction.depth = 3,
+                      shrinkage = 0.005,
+                      cv.folds = 10)
+
+nt <- gbm.perf(boosting_prost, method = "cv")
+```
+
+## Part F
+
+(f) Which of the above models will you select to predict PSA level? Explain.
+
+```{r}
+
+```
+
+# Problem 2
+
+## Pulling & Creating Training/Test Datasets
+```{r}
+data("OJ")
+dat_oj <- OJ %>% 
+  janitor::clean_names()
+
+set.seed(1)
+
+rowTrain <- createDataPartition(y = dat_oj$purchase,
+                               p = 799/1070,
+                               list = FALSE)
+
+train_dat_oj <- as.data.frame(dat_oj[rowTrain,])
+test_dat_oj <- as.data.frame(dat_oj[-rowTrain,])
+
+```
+
+## Part A
+
+
+```{r}
+set.seed(1)
+
+oj_tree <- rpart(purchase ~., data = dat_oj,
+                 subset = rowTrain,
+                 control = rpart.control(cp = 0))
+#rpart.plot(oj_tree)
+
+cp_table_oj <- printcp(oj_tree)
+plotcp(oj_tree)
+minErr_oj <- which.min(cp_table_oj[,4])
+
+# minimum cross-validation error
+oj_tree_2 <- prune(oj_tree, cp = cp_table_oj[minErr_oj, 1])
+rpart.plot(oj_tree_2)
+
+oj_tree_pred <- predict(oj_tree_2, newdata = test_dat_oj)
+oj_tree_mse <- mse(oj_tree_pred, test_dat_oj$purchase)
+```
+Using cross-validation to determine the tree size, the tree size should be 6. The test classification MSE is `r oj_tree_mse`, so the classification error rate is `r 1- oj_tree_mse`.
+
+## Part B
+
+Perform random forests on the training set and report variable importance. What is the test error rate?
 
 ```{r}
 
