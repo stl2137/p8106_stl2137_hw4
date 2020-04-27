@@ -12,6 +12,7 @@ library(rpart.plot)
 library(randomForest)
 library(gbm)
 library(ranger)
+library(caret)
 ```
 
 # Question 1
@@ -175,8 +176,6 @@ test_dat_oj <- as.data.frame(dat_oj[-rowTrain,])
 
 ## Part A
 
-What is the test classification error rate?
-
 ```{r}
 set.seed(1)
 oj_tree <- rpart(purchase ~., data = train_dat_oj,
@@ -191,11 +190,20 @@ minErr_oj <- which.min(cp_table_oj[,4])
 oj_tree_2 <- prune(oj_tree, cp = cp_table_oj[minErr_oj, 1])
 rpart.plot(oj_tree_2)
 
+### Building Confusion Matrix
+test_oj_tree_prob <- predict(oj_tree_2, newdata = test_dat_oj, type = "prob")
+test_oj_tree_prob <- test_oj_tree_prob[,1]
+test_oj_tree_pred <- rep("CH", 270)
+test_oj_tree_pred[test_oj_tree_prob > 0.5] <- "MM"
+
+oj_tree_matrix <- caret::confusionMatrix(data = as.factor(test_oj_tree_pred),
+                reference = test_dat_oj$purchase,
+                positive = "MM")
 ```
 
-## Part B
+Based off the confusion matrix, it has an accuracy of `r oj_tree_matrix$overall[1]`. Thus, it has an error of `r 1 - oj_tree_matrix$overall[1]`. 
 
-What is the test error rate?
+## Part B
 
 ```{r}
 set.seed(1)
@@ -214,7 +222,6 @@ barplot(sort(ranger::importance(rf_oj), decreasing = FALSE),
 The customer brand loyalty for Citrus Hill orange juice, at a value of `r max(importance(rf_oj))`, has the highest variable importance. As you can see in the bar plot, it a much higher variable importance compared to the other variables. 
 
 ## Part C 
-report variable importance. What is the test error rate?
 
 ```{r}
 set.seed(1)
@@ -230,6 +237,7 @@ nt_oj = gbm.perf(boosting_oj, method = "cv")
 
 summary(boosting_oj, las = 2, cBars = 19, cex.names = 0.6)
 boosting_imp_oj <- summary(boosting_oj)
+
 ```
 
 The customer brand loyalty for Citrus Hill orange juice, at a value of `r boosting_imp_oj$rel.inf[1]`, has the highest variable importance. As you can see in the bar plot, it a much higher variable importance compared to the other variables.The week of purchase variable, at a value of `r boosting_imp_oj$rel.inf[2]`, has the 2nd highest variable importance.
