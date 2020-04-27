@@ -1,6 +1,8 @@
 ---
 title: "p8106_stl2137_hw4"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -13,6 +15,7 @@ library(randomForest)
 library(gbm)
 library(ranger)
 library(caret)
+library(ISLR)
 ```
 
 # Question 1
